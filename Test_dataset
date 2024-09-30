@@ -1,0 +1,68 @@
+import torch
+from sklearn.metrics import confusion_matrix, classification_report, accuracy_score, precision_score, recall_score, f1_score
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.metrics import ConfusionMatrixDisplay
+
+# Function to compute confusion matrix and classification metrics
+def compute_metrics(model, dataloader, device, class_names):
+    model.eval()  # Set model to evaluation mode
+    all_preds = []
+    all_labels = []
+
+    with torch.no_grad():  # Disable gradient computation
+        for inputs, labels in dataloader:
+            inputs, labels = inputs.to(device), labels.to(device)
+            outputs = model(inputs)
+            _, preds = torch.max(outputs, 1)
+            all_preds.extend(preds.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
+
+    # Convert lists to numpy arrays
+    all_preds = np.array(all_preds)
+    all_labels = np.array(all_labels)
+
+    # Compute confusion matrix
+    cm = confusion_matrix(all_labels, all_preds, labels=range(len(class_names)))
+    
+    # Display confusion matrix
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=class_names)
+    disp.plot(cmap=plt.cm.Blues)
+    plt.title("Confusion Matrix")
+    plt.show()
+
+    # Compute classification metrics
+    print("Classification Report:")
+    print(classification_report(all_labels, all_preds, target_names=class_names))
+
+    # Additional metrics: accuracy, precision, recall, f1-score
+    accuracy = accuracy_score(all_labels, all_preds)
+    precision = precision_score(all_labels, all_preds, average='macro')  # Average over all classes
+    recall = recall_score(all_labels, all_preds, average='macro')
+    f1 = f1_score(all_labels, all_preds, average='macro')
+
+    print(f'Accuracy: {accuracy:.4f}')
+    print(f'Precision: {precision:.4f}')
+    print(f'Recall: {recall:.4f}')
+    print(f'F1-Score: {f1:.4f}')
+
+# Assuming you have a DataLoader for your test dataset
+# Example:
+test_dir = '/path/to/dataset/test'
+transform_test = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+])
+test_dataset = datasets.ImageFolder(root=test_dir, transform=transform_test)
+test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False, num_workers=4)
+
+# Load the best model checkpoint
+model.load_state_dict(torch.load('/path/to/saved_model.pth'))
+model = model.to(device)
+
+# Class names are derived from the dataset folder structure
+class_names = test_dataset.classes
+
+# Call the function to compute metrics
+compute_metrics(model, test_loader, device, class_names)
